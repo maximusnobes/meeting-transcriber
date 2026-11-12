@@ -1,0 +1,14 @@
+# Recordings and transcripts are private; secrets live outside the repo
+*.m4a
+*.wav
+*.mp3
+*.txt
+!requirements.txt
+*.json
+.hf_token
+*.save
+
+whisper-env/
+venv/
+__pycache__/
+.DS_Store

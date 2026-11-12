@@ -8,7 +8,15 @@ Turn a meeting recording into a speaker-labeled transcript with one command, wit
 
 ## Why I built it
 
-I wanted searchable notes from long client calls without uploading confidential conversations to a third-party transcription service. This runs entirely on Apple Silicon: [MLX Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) for transcription and [pyannote](https://github.com/pyannote/pyannote-audio) for working out who is speaking.
+Speaker-labeled meeting transcription already exists as a paid, cloud-based service: you upload your recording and a company's servers process it. I wanted the same result as a free, self-hosted tool, so that confidential conversations never leave my own machine. Nothing is uploaded, there's no subscription, and the recordings and transcripts stay in a folder you control.
+
+It runs entirely on Apple Silicon: [MLX Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) for transcription and [pyannote](https://github.com/pyannote/pyannote-audio) for working out who is speaking.
+
+## Consent and recording laws
+
+I only used this tool on recordings of meetings where everyone present knew they were being recorded and agreed to it.
+
+If you use it, check the rules that apply to you first. Recording laws differ by country and by state: some places allow recording when one participant consents, while others, including California, require the consent of everyone in the conversation. Your workplace, school or clients may have their own policies too. When in doubt, tell everyone at the start of the meeting and get their agreement before you record. This README is not legal advice.
 
 ## How it works
 

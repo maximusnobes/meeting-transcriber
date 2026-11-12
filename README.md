@@ -44,7 +44,8 @@ A macOS notification fires when each transcript is ready, or if one fails.
 
    ```bash
    brew install ffmpeg
-   python3 -m venv ~/whisper-env
+   brew install python@3.12
+   python3.12 -m venv ~/whisper-env
    source ~/whisper-env/bin/activate
    pip install -r requirements.txt
    ```

@@ -1,15 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-# Manual usage:
+# Usage (from the project folder):
 #   ./transcribe.sh ~/Downloads/MyMeeting.m4a
 #   ./transcribe.sh ~/Downloads/MyMeeting.m4a --speakers 4
+#   ./transcribe.sh ~/Downloads/MyMeeting.m4a --names "SPEAKER_00=Alex,SPEAKER_01=Sam"
 #
-# Also called by watch_downloads.sh for automatic runs.
 # Any extra arguments pass straight through to process_meeting.py.
+# Also called by watch_downloads.sh if you set up the optional watcher.
 
 # Homebrew is not on launchd's default PATH, so set it explicitly.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+# Everything (scripts, venv, recordings, transcripts) lives in this folder.
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ $# -lt 1 ]; then
   echo "Error: Please provide an audio file."
@@ -25,8 +29,13 @@ if [ ! -f "$INPUT_FILE" ]; then
   exit 1
 fi
 
-AUDIO_VAULT="$HOME/Audio Recordings"
-TRANSCRIPT_VAULT="$HOME/Meeting Transcriptions"
+if [ ! -x "$DIR/venv/bin/python" ]; then
+  echo "Error: $DIR/venv not found. Run ./setup.sh first."
+  exit 1
+fi
+
+AUDIO_VAULT="$DIR/Audio Recordings"
+TRANSCRIPT_VAULT="$DIR/Meeting Transcriptions"
 mkdir -p "$AUDIO_VAULT" "$TRANSCRIPT_VAULT"
 
 FILENAME=$(basename -- "$INPUT_FILE")
@@ -40,7 +49,9 @@ echo "========================================"
 
 # Archive the original first. Format conversion happens inside Python against
 # a temp file, so the source recording is never re-encoded or modified.
-if [ "$INPUT_FILE" != "$TARGET_FILE" ]; then
+if [ "$INPUT_FILE" -ef "$TARGET_FILE" ]; then
+  echo "File is already in Audio Recordings."
+else
   if [ -e "$TARGET_FILE" ]; then
     # Don't clobber an earlier recording that happens to share a name.
     TARGET_FILE="$AUDIO_VAULT/${NAME_ONLY}_$(date +%Y%m%d-%H%M%S).${FILENAME##*.}"
@@ -48,16 +59,11 @@ if [ "$INPUT_FILE" != "$TARGET_FILE" ]; then
   fi
   echo "Moving file to Audio Recordings..."
   mv "$INPUT_FILE" "$TARGET_FILE"
-else
-  echo "File is already in Audio Recordings."
 fi
 
 echo "Loading models..."
-# shellcheck disable=SC1090
-source ~/whisper-env/bin/activate
-
 # set -e aborts here if Python fails, so the success banner cannot lie.
-python ~/process_meeting.py "$TARGET_FILE" "$@"
+"$DIR/venv/bin/python" "$DIR/process_meeting.py" "$TARGET_FILE" "$@"
 
 echo "========================================"
 echo "DONE"

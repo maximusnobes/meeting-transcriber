@@ -1,14 +1,15 @@
-# Recordings and transcripts are private; secrets live outside the repo
+# Recordings, transcripts and secrets never go in the repo
+Audio Recordings/
+Meeting Transcriptions/
 *.m4a
 *.wav
 *.mp3
-*.txt
-!requirements.txt
-*.json
+vocab.txt
 .hf_token
 *.save
+setup.log
 
-whisper-env/
 venv/
+whisper-env/
 __pycache__/
 .DS_Store

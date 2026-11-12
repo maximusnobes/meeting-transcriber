@@ -1,5 +1,5 @@
 #!/bin/bash
-# Triggered by launchd whenever ~/Downloads changes.
+# OPTIONAL. Triggered by launchd whenever ~/Downloads changes (see README).
 # Finds finished .m4a files, transcribes them, notifies on completion.
 #
 # Deliberately NOT using `set -e`: if one file fails we still want to try
@@ -9,7 +9,8 @@ set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 WATCH_DIR="$HOME/Downloads"
-TRANSCRIBE="$HOME/transcribe.sh"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TRANSCRIBE="$DIR/transcribe.sh"
 LOCKDIR="/tmp/transcribe_watch.lock"
 
 # How long a file's size must stay unchanged before we consider the download

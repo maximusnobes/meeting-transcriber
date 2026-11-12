@@ -32,8 +32,11 @@ from pyannote.audio import Pipeline
 # --- CONFIGURATION ---
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 DIARIZATION_MODEL = "pyannote/speaker-diarization-3.1"
-TRANSCRIPT_FOLDER = os.path.expanduser("~/Meeting Transcriptions")
-VOCAB_FILE = os.path.expanduser("~/.meeting_vocab.txt")
+# Everything lives next to this script, so the whole project is one folder.
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+TRANSCRIPT_FOLDER = os.path.join(PROJECT_DIR, "Meeting Transcriptions")
+VOCAB_FILE = os.path.join(PROJECT_DIR, "vocab.txt")
+# The token stays outside the project folder so it can never be committed.
 TOKEN_FILE = os.path.expanduser("~/.hf_token")
 
 # Bounds on speaker clustering. These are applied on every run so you never

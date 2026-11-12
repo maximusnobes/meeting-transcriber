@@ -1,11 +1,10 @@
 # Local Meeting Transcriber
 
-Drop a meeting recording into your Downloads folder and get back a speaker-labeled transcript, without the audio ever leaving your Mac.
+Turn a meeting recording into a speaker-labeled transcript with one command, without the audio ever leaving your Mac.
 
-```
-[00:00:04] SPEAKER_00: Thanks for joining. Let's start with the mail schedule.
-[00:00:11] SPEAKER_01: The first piece drops on the twelfth, so proofs are due Friday.
-```
+![A transcription run in Terminal and the resulting transcript](docs/example-run.png)
+
+*Example run on a made-up recording. Names and dialogue are illustrative.*
 
 ## Why I built it
 
@@ -14,70 +13,94 @@ I wanted searchable notes from long client calls without uploading confidential 
 ## How it works
 
 ```
-~/Downloads/*.m4a
-   │  launchd notices the folder changed
+./transcribe.sh ~/Downloads/meeting.m4a
+   │
+   ├─ moves the original into  Audio Recordings/   (never re-encoded)
    ▼
-watch_downloads.sh   waits until the download has finished, one run at a time
+process_meeting.py
+   ffmpeg        → 16 kHz mono copy in a temp folder
+   MLX Whisper   → words with timestamps
+   pyannote      → who spoke when
+   merge         → each word goes to the speaker it overlaps most,
+                   new paragraph after a 3-second pause
    ▼
-transcribe.sh        archives the original to ~/Audio Recordings
-   ▼
-process_meeting.py   ffmpeg → 16 kHz mono → Whisper (words + timestamps)
-                     → pyannote (speaker turns) → merge → paragraphs
-   ▼
-~/Meeting Transcriptions/<name>.txt  and  <name>.json
+Meeting Transcriptions/meeting.txt    readable transcript
+Meeting Transcriptions/meeting.json   same lines with exact timings
 ```
 
-A macOS notification fires when each transcript is ready, or if one fails.
-
-## Details worth knowing
-
-- **Speaker matching.** Each word is assigned to the speaker turn it overlaps most, then words are grouped into paragraphs, with a new paragraph after a pause of more than 3 seconds.
-- **Sensible speaker bounds.** Clustering is limited to 2–8 speakers by default, which avoids pyannote's two common failures: inventing speakers out of background noise and merging everyone into one. Override with `--speakers`, `--min-speakers` or `--max-speakers`.
-- **Fewer hallucinations.** Whisper's `condition_on_previous_text` is turned off, which prevents the repeated-phrase loops it tends to fall into on long recordings.
-- **Vocabulary priming.** Put names, acronyms and jargon in `~/.meeting_vocab.txt` (or pass `--prompt`) so Whisper spells them correctly.
-- **Real names.** `--names "SPEAKER_00=Alex,SPEAKER_01=Sam"` relabels speakers in the output.
-- **Safe with your files.** The original recording is moved, never re-encoded, and a recording with a duplicate name is archived under a timestamped name rather than overwritten.
+Everything (scripts, Python environment, recordings and transcripts) lives in this one folder. The only thing kept outside it is your Hugging Face token, in `~/.hf_token`, so it can never be committed by accident.
 
 ## Setup (macOS, Apple Silicon)
 
-1. Install ffmpeg and create the Python environment:
+1. **Get the code** and put the folder wherever you like (these steps assume `~/Transcription`):
 
    ```bash
-   brew install ffmpeg
-   brew install python@3.12
-   python3.12 -m venv ~/whisper-env
-   source ~/whisper-env/bin/activate
-   pip install -r requirements.txt
+   git clone https://github.com/maximusnobes/meeting-transcriber.git ~/Transcription
    ```
 
-2. Accept the user conditions for [`pyannote/speaker-diarization-3.1`](https://huggingface.co/pyannote/speaker-diarization-3.1) on Hugging Face, create a read token, and save it where background jobs can find it:
+2. **Get Hugging Face access** for the speaker model (free):
+   - Accept the terms on [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1) and [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0).
+   - Create a **Read** token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+
+3. **Run the setup script.** It installs ffmpeg and [uv](https://github.com/astral-sh/uv) with Homebrew, builds a Python 3.12 environment in `venv/`, asks you to paste your token (input is hidden), and checks that everything works:
 
    ```bash
-   echo "hf_your_token_here" > ~/.hf_token && chmod 600 ~/.hf_token
+   bash ~/Transcription/setup.sh
    ```
 
-   (`HF_TOKEN` in your environment also works for manual runs.)
+   Every check prints `OK` or `FAIL`, and the full output is saved to `setup.log`. You'll need [Homebrew](https://brew.sh) installed first.
 
-3. Put the scripts where `transcribe.sh` expects them:
+## Usage
 
-   ```bash
-   cp process_meeting.py transcribe.sh watch_downloads.sh ~/
-   chmod +x ~/transcribe.sh ~/watch_downloads.sh
-   ```
+```bash
+cd ~/Transcription
+./transcribe.sh ~/Downloads/MyMeeting.m4a
+```
 
-4. **Manual use:**
+The first run downloads the models (a few GB) to `~/.cache/huggingface`; after that, everything runs offline apart from a quick access check on the gated speaker model.
 
-   ```bash
-   ~/transcribe.sh ~/Downloads/MyMeeting.m4a --speakers 3
-   ```
+Useful options (anything after the file name is passed through):
 
-5. **Automatic use:** edit `com.example.transcribe-watch.plist` (replace `YOUR_USERNAME`), copy it to `~/Library/LaunchAgents/`, and load it:
+| Option | What it does |
+| --- | --- |
+| `--speakers 3` | Exact number of speakers, if you know it |
+| `--min-speakers` / `--max-speakers` | Bounds for speaker detection (default 2–8) |
+| `--names "SPEAKER_00=Alex,SPEAKER_01=Sam"` | Replace speaker labels with real names |
+| `--language auto` | Detect the language instead of assuming English |
+| `--prompt "Acme, Q3, OKR"` | Vocabulary hint for names and jargon |
 
-   ```bash
-   launchctl load ~/Library/LaunchAgents/com.example.transcribe-watch.plist
-   ```
+For vocabulary you use all the time, put a short comma-separated list in `vocab.txt` in this folder and it's applied to every run.
 
-The first run downloads the models (a few GB) to `~/.cache/huggingface`. After that, everything runs offline apart from a quick access check on the gated pyannote model.
+## Design notes
+
+- **Sensible speaker bounds.** Clustering is limited to 2–8 speakers by default, which avoids pyannote's two common failures: inventing speakers out of background noise and merging everyone into one.
+- **Fewer hallucinations.** Whisper's `condition_on_previous_text` is turned off, which prevents the repeated-phrase loops it tends to fall into on long recordings.
+- **Safe with your files.** The original recording is moved, never modified, and a duplicate file name is archived with a timestamp rather than overwritten.
+- **Pinned versions.** `pyannote.audio` 3.x checkpoints don't load on PyTorch 2.6+, so `requirements.txt` pins compatible versions.
+
+## Optional: transcribe automatically
+
+`watch_downloads.sh` can run in the background and transcribe any `.m4a` that lands in `~/Downloads`, with a macOS notification when each one finishes. It waits for downloads to complete and never runs two jobs at once. To turn it on, edit `com.example.transcribe-watch.plist` (replace `YOUR_USERNAME`), then:
+
+```bash
+cp com.example.transcribe-watch.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.example.transcribe-watch.plist
+```
+
+To turn it off again: `launchctl unload ~/Library/LaunchAgents/com.example.transcribe-watch.plist`
+
+## Project layout
+
+```
+transcribe.sh               the command you run
+process_meeting.py          transcription, speaker detection, output
+setup.sh                    one-time install and checks
+watch_downloads.sh          optional background watcher
+com.example.transcribe-watch.plist   launchd config for the watcher
+requirements.txt            pinned Python packages
+Audio Recordings/           archived originals      (created on first run, git-ignored)
+Meeting Transcriptions/     transcripts             (created on first run, git-ignored)
+```
 
 ## License
 
